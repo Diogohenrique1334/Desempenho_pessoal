@@ -1,23 +1,15 @@
 import pandas as pd
 from PIL import Image
 from streamlit_echarts import st_echarts
-from funcoes import ajustes_variaveis as fc
+import funcoes as fc
 from funcoes import graficos
 import streamlit as st
 import datetime as dt
 
 #Importando o dataset
-df = pd.read_excel('planilha da vida.xlsx')
-#Add atributos
-df['Dia da semana'] = df['Data'].dt.weekday.map({6:'Dom',0:'Seg',1:'Ter',2:'Qua',3:'Qui',4:'Sex',5:'Sab'})
-df['mes'] = df["Data"].dt.strftime('%m - %Y')
-# Criar uma coluna adicional para ordenação
-df['mes_ordenacao'] = pd.to_datetime(df['Data']).dt.to_period('M')
-# Definir a ordem das categorias da coluna 'mes'
-df['mes'] = pd.Categorical(df['mes'], categories=df.sort_values('mes_ordenacao')['mes'].unique(), ordered=True)
-# Remover a coluna de ordenação
-df = df.drop(columns=['mes_ordenacao'])
-df['Dia da semana'] = pd.Categorical(df['Dia da semana'], categories=['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab', 'Dom'], ordered=True)
+
+df = fc.dados().carregar_dados()
+
 #variaveis
 categorias1 = df[
     [
@@ -27,7 +19,7 @@ categorias1 = df[
         'Exercício aeróbico', 
         'Alimentação saudável',
         'Consumo de água',
-        'Atenção plena', 
+#        'Atenção plena', 
         'Academia',
         'Atividade sexual'
     ]
@@ -37,11 +29,6 @@ Hiper_categoria = {'secreto':'Lazer', 'Estudar':'Evolução pessoal', 'Leitura':
     'Alimentação saudável':'Saúde do corpo', 'Consumo de água':'Saúde do corpo','Atenção plena':'Saúde da mente', 'Academia':'Saúde do corpo',
     'Atividade sexual':'Lazer'}
 
-#Ajustes variáveis
-df = fc(fc(fc(df).tratamento_hora()).tempo_sono_n()).Humor()
-#df = fc(df).tratamento_hora()
-
-#df = fc(df).tempo_sono_n()
 
 #imagem do painel de filtros
 imagem = Image.open("foto_diogo.jpg")
@@ -117,6 +104,6 @@ with st.container(border = True, height = 480):
 
 with st.container(border = True, height = 400):
         st.subheader('Nota de humor por dia')
-        st_echarts(graficos(table=df_filtrado).grefico_calendario(categorias='Nota do humor'), height="300px", key="echarts")
+        st_echarts(graficos(table=df_filtrado).grefico_calendario(categorias='Nota do humor',ano_1=2024,ano_2=2025,ano_3=2026), height=500, key="echarts")
 
 

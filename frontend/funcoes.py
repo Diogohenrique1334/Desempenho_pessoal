@@ -5,7 +5,10 @@ import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 import plotly.express as px
 from streamlit_echarts import st_echarts
-
+from dotenv import load_dotenv
+load_dotenv()
+import os
+from sqlalchemy import create_engine
 """
 Melhorias:
 1° grafico por tarefas: usar a mesma funçao para mês e horas
@@ -13,7 +16,6 @@ Melhorias:
 2° grafico de calendário, selecionar os meses automáticamente
 """
 
-#variaveis globais
 scaler = MinMaxScaler()
 
 #funcoes_globais
@@ -33,69 +35,6 @@ class ajustes_variaveis:
 
         self.table = table
 
-
-    def tratamento_hora(self,table = None):
-
-        if table is None:
-            table = self.table
-        else:
-            table
-        
-        table['Horario que eu fui dormir'] = \
-        table['Horario que eu fui dormir'].fillna('00:00:00').map(
-        lambda x: (dt.datetime.strptime(str(x).split(' ')[1], '%H:%M:%S') + dt.timedelta(days = 1)) 
-        if dt.datetime.strptime(str(x), '%H:%M:%S').hour in range(10)
-        else (dt.datetime.strptime(str(x), '%H:%M:%S'))
-        )
-        
-        table['Horario que eu fui dormir'] = \
-        table.apply(lambda x: x['Data'] + dt.timedelta(days = (x['Horario que eu fui dormir'].day) - 1, 
-                                                hours = x['Horario que eu fui dormir'].hour, 
-                                                minutes = x['Horario que eu fui dormir'].minute), axis=1)
-        
-#        table['Hora que eu acordei'] = table['Hora que eu acordei'].fillna('00:00:00').map(lambda x: dt.datetime.strptime(str(x).split(' ')[2],'%H:%M:%S'))
-        
-#        table['Hora que eu acordei'] = \
-#        table.apply(lambda x: x['Data'] + dt.timedelta(hours = x['Hora que eu acordei'].hour, 
-#                                                minutes = x['Hora que eu acordei'].minute), axis=1)
-        
-        acordou = table[table['Hora que eu acordei'].dt.hour != 0].reset_index()[['Hora que eu acordei','index']]
-        dormiu = table[table['Hora que eu acordei'].dt.hour != 0].reset_index()[['Horario que eu fui dormir','index']]
-        tempo_sono = pd.DataFrame()
-        
-        for x in range(len(dormiu)-1):
-        
-            tempo_sono = pd.concat(
-                [pd.DataFrame({'chave':acordou['index'].loc[x+1],
-                    "Horas dormindo":[acordou['Hora que eu acordei'].loc[x+1] - dormiu['Horario que eu fui dormir'].loc[x]]}),tempo_sono]
-            )
-
-        
-        
-        table = pd.merge(left=table,
-                        right=tempo_sono,
-                        left_index=True, 
-                        right_on='chave', 
-                        how='left').reset_index().drop(columns='index')
-
-        return table
-
-    def tempo_sono_n(self,table = None):
-
-        if table is None:
-            table = self.table
-        else:
-            table
-
-        table['Horas dormindo'] = table['Horas dormindo'].apply(substituir_outliers)
-        table['Tempo de sono'] = scaler.fit_transform(
-            table['Horas dormindo'].fillna(table[table['Horas dormindo'].map(lambda x: str(x).split(' ')[0]) == '0' ]['Horas dormindo'].mean()
-                                    ).values.reshape(-1,1)).flatten()
-        
-        table['Tempo de sono'] = table.apply(lambda x: np.nan if pd.isna(x['Horas dormindo']) else x['Tempo de sono'], axis = 1)
-
-        return table
-
     def Humor(self,table = None):
 
         if table is None:
@@ -103,12 +42,10 @@ class ajustes_variaveis:
         else:
             table
 
-        table['Humor'] = scaler.fit_transform(
-            (table['Nota do humor'] + table['Nota do humor fim do dia']).values.reshape(-1,1)
-        ).flatten()
+        table['Humor'] = table.apply(lambda x: (x['Nota do humor'] + x['Nota do humor fim do dia']) / 2, axis = 1)
 
         return table
-
+    
 class graficos:
 
     def __init__(self,table = None, colunas = None):
@@ -146,7 +83,6 @@ class graficos:
         
         return aderencia_por_hora
         
-    
     def grafico_barras(self,titulo,cor = None, tamanho = 350):
 
         if cor is None:
@@ -201,14 +137,13 @@ class graficos:
 
         return liquidfill_option
 
-    
     def grafico_linhas_tempo(self,coluna_data,categorias,titulo,cor = ['#18990b'],tamanho = 350 ):
 
-        linha_tempo_aderencia = px.line(
+        linha_tempo_aderencia = px.bar(
             self.table.set_index(coluna_data)[categorias].squeeze().resample('m').mean().asfreq('m').reset_index().melt(coluna_data).dropna(subset = 'value').drop(columns ='variable').groupby(coluna_data)['value'].mean()
         , title=titulo,height=tamanho,color_discrete_sequence=cor)
 
-        linha_tempo_aderencia.update_traces(mode='lines+markers')
+        #linha_tempo_aderencia.update_traces(mode='lines+markers')
 
         linha_tempo_aderencia.update_layout(
             showlegend=False,
@@ -231,27 +166,74 @@ class graficos:
 
         return linha_tempo_aderencia
     
-    def grefico_calendario(self, categorias,ano_1,ano_2):
+    def grefico_calendario(self, categorias, ano_1, ano_2, ano_3):
 
-        datas = self.table[categorias].reset_index().melt(id_vars='Data').dropna(axis=0).pivot_table(index ='Data', values='value', aggfunc='sum')
+        # --- 1) Preparação dos dados ---
+        # categorias deve ser uma lista de colunas; 'Data' precisa estar no index do self.table
+        # Vamos derreter -> somar por dia -> garantir tipos corretos
+        df = (
+            self.table[categorias]
+            .reset_index()  # traz 'Data' para coluna
+            .melt(id_vars='Data', var_name='Categoria', value_name='value')
+        )
 
-        # Separar dados por ano
-        data_1 = [[str(index.date()), int(row['value'])] for index, row in datas.iterrows() if index.year == ano_1]
-        data_2 = [[str(index.date()), int(row['value'])] for index, row in datas.iterrows() if index.year == ano_2]
+        # Tipos corretos
+        df['Data'] = pd.to_datetime(df['Data'], errors='coerce')
+        df['value'] = pd.to_numeric(df['value'], errors='coerce')
 
+        # Remove linhas inválidas e agrega por dia
+        datas = (
+            df.dropna(subset=['Data'])  # mantém linhas com Data válida (valor pode ser NaN e virar None)
+            .pivot_table(index='Data', values='value', aggfunc='sum')
+            .sort_index()
+        )
+
+        # --- 2) Helpers para converter para tipos nativos/serializáveis ---
+        def _to_date_str(idx):
+            # ECharts (calendário) gosta de "YYYY-MM-DD"
+            return idx.strftime("%Y-%m-%d")
+
+        def _to_native_val(x):
+            # None para NaN/<NA>; int nativo para numéricos
+            if pd.isna(x):
+                return None  # ou 0, se preferir preencher vazio
+            return int(x)
+
+        def _build_year(y: int):
+            out = []
+            if datas.empty:
+                return out
+            # Evita iterrows; usamos index + values e filtramos pelo ano
+            for idx, val in zip(datas.index, datas['value'].values):
+                if isinstance(idx, pd.Timestamp) and not pd.isna(idx) and idx.year == y:
+                    out.append([_to_date_str(idx), _to_native_val(val)])
+            return out
+
+        data_1 = _build_year(ano_1)
+        data_2 = _build_year(ano_2)
+        data_3 = _build_year(ano_3)
+
+        # Max para o visualMap (float nativo; fallback quando NaN)
+        if datas.empty:
+            vmax_native = 1.0
+        else:
+            vmax = pd.to_numeric(datas['value'], errors='coerce').max()
+            vmax_native = float(vmax) if pd.notna(vmax) else 1.0
+
+        # --- 3) Opções do ECharts ---
         option1 = {
             "tooltip": {"position": "top"},
             "visualMap": {
                 "min": 0,
-                "max": datas['value'].max() if not datas.empty else 1,  # Ajuste para máximo dos dados
+                "max": vmax_native,
                 "calculable": True,
                 "orient": "horizontal",
                 "left": "center",
-                "low": "low",
-                "color": ['#18990b', '#cac2c2'],
+                # Use o esquema de cores padrão do ECharts via inRange
+                "inRange": {"color": ["#cac2c2", "#18990b"]},  # claro -> escuro
             },
             "calendar": [
-                { # Calendário 2024
+                {  # Calendário ano_1
                     "range": str(ano_1),
                     "cellSize": ["auto", 14],
                     "top": "7%",
@@ -259,39 +241,73 @@ class graficos:
                     "itemStyle": {"color": "#ffffff"},
                     "dayLabel": {"color": "#ffffff"},
                     "monthLabel": {"color": "#ffffff"},
-                    "yearLabel": {"color": "#cac2c2"}
+                    "yearLabel": {"color": "#cac2c2"},
                 },
-                { # Calendário 2025
+                {  # Calendário ano_2
                     "range": str(ano_2),
                     "cellSize": ["auto", 14],
-                    "top": "50%",  # Posicionado abaixo do primeiro calendário
+                    "top": "33%",
                     "splitLine": {"lineStyle": {"color": "#000000"}},
                     "itemStyle": {"color": "#ffffff"},
                     "dayLabel": {"color": "#ffffff"},
                     "monthLabel": {"color": "#ffffff"},
-                    "yearLabel": {"color": "#cac2c2"}
-                }
+                    "yearLabel": {"color": "#cac2c2"},
+                },
+                {  # Calendário ano_3
+                    "range": str(ano_3),
+                    "cellSize": ["auto", 14],
+                    "top": "60%",
+                    "splitLine": {"lineStyle": {"color": "#000000"}},
+                    "itemStyle": {"color": "#ffffff"},
+                    "dayLabel": {"color": "#ffffff"},
+                    "monthLabel": {"color": "#ffffff"},
+                    "yearLabel": {"color": "#cac2c2"},
+                },
             ],
             "series": [
-                { # Série para 2024
+                {
                     "type": "heatmap",
                     "coordinateSystem": "calendar",
                     "calendarIndex": 0,
-                    "data": data_1
+                    "data": data_1,
                 },
-                { # Série para 2025
+                {
                     "type": "heatmap",
                     "coordinateSystem": "calendar",
                     "calendarIndex": 1,
-                    "data": data_2
-                }
+                    "data": data_2,
+                },
+                {
+                    "type": "heatmap",
+                    "coordinateSystem": "calendar",
+                    "calendarIndex": 2,
+                    "data": data_3,
+                },
             ],
         }
 
-        return option1
-    
+        # --- 4) Blindagem final contra tipos NumPy/Pandas no dicionário ---
+        def to_native(obj):
+            from datetime import date, datetime
+            if isinstance(obj, (np.integer,)):  # np.int64 -> int
+                return int(obj)
+            if isinstance(obj, (np.floating,)):  # np.float64 -> float
+                return float(obj)
+            if isinstance(obj, (np.bool_,)):  # np.bool_ -> bool
+                return bool(obj)
+            if isinstance(obj, (pd.Timestamp, datetime)):  # datas -> string ISO
+                return obj.isoformat()
+            if obj is pd.NaT:
+                return None
+            if isinstance(obj, np.ndarray):
+                return [to_native(x) for x in obj.tolist()]
+            if isinstance(obj, (list, tuple, set)):
+                return [to_native(x) for x in obj]
+            if isinstance(obj, dict):
+                return {str(k): to_native(v) for k, v in obj.items()}
+            return obj
 
-    #mapa de calor da correlação
+        return to_native(option1)
 
     def mapa_valor(self, categorias):
 
@@ -339,63 +355,3 @@ class graficos:
         }
 
         return option
-        
-"""
-
-options = {
-    "tooltip": {"trigger": "axis", "axisPointer": {"type": "shadow"}},
-    "legend": {
-        "data": ["Direct", "Mail Ad", "Affiliate Ad", "Video Ad", "Search Engine"]
-    },
-    "grid": {"left": "3%", "right": "4%", "bottom": "3%", "containLabel": True},
-    "xAxis": {"type": "value"},
-    "yAxis": {
-        "type": "category",
-        "data": ["seg", "ter", "quar", "quin", "sex", "sab", "don"],
-    },
-    "series": [
-        {
-            "name": "Direct",
-            "type": "bar",
-            "stack": "total",
-            "label": {"show": True},
-            "emphasis": {"focus": "series"},
-            "data": [320, 302, 301, 334, 390, 330, 320],
-        },
-        {
-            "name": "Mail Ad",
-            "type": "bar",
-            "stack": "total",
-            "label": {"show": True},
-            "emphasis": {"focus": "series"},
-            "data": [120, 132, 101, 134, 90, 230, 210],
-        },
-        {
-            "name": "Affiliate Ad",
-            "type": "bar",
-            "stack": "total",
-            "label": {"show": True},
-            "emphasis": {"focus": "series"},
-            "data": [220, 182, 191, 234, 290, 330, 310],
-        },
-        {
-            "name": "Video Ad",
-            "type": "bar",
-            "stack": "total",
-            "label": {"show": True},
-            "emphasis": {"focus": "series"},
-            "data": [150, 212, 201, 154, 190, 330, 410],
-        },
-        {
-            "name": "Search Engine",
-            "type": "bar",
-            "stack": "total",
-            "label": {"show": True},
-            "emphasis": {"focus": "series"},
-            "data": [820, 832, 901, 934, 1290, 1330, 1320],
-        },
-    ],
-}
-st_echarts(options=options, height="500px")
-"""
-    

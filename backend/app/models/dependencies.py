@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker
 
 # Mantenha a importação do seu 'db' (engine)
 # Supondo que ele esteja em um arquivo 'database.py' ou 'models.py'
-from models import engine
+from backend.app.models.models import engine
 
 # Adicione este decorador
 @contextmanager

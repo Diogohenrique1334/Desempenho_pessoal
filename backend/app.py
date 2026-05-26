@@ -16,8 +16,8 @@ PHONE_NUMBER_ID = os.getenv("PHONE_NUMBER_ID")
 ACCESS_TOKEN = os.getenv("ACCESS_TOKEN")
 VERIFY_TOKEN = os.getenv("VERIFY_TOKEN")
 
-from models import Minha_vida
-from dependencies import pegar_sessao
+from app.models.models import Minha_vida
+from app.models.dependencies import pegar_sessao
 
 app = FastAPI()
 
