@@ -543,7 +543,7 @@ def barras_empilhadas_horizontais(raw_data=None, series_names=None, eixo=None, t
 
     return st_echarts(options=options, height=tamanho)
 
-def barras_drilldown(drilldown_data,categorias,dados_principais,tamanho ="500px" ):
+def barras_drilldown(drilldown_data,categorias,dados_principais,tamanho ="300px" ):
 
     if "bar_drilldown_group" not in st.session_state:
         st.session_state.bar_drilldown_group = None

@@ -2,8 +2,8 @@ import pandas as pd
 from PIL import Image
 from streamlit_echarts import st_echarts
 from utils.tratamente_dados import preparar_df
-from utils.graficos import liquid_fill,meia_rosca, barras_simples,barras_empilhadas_laterais, barras_empilhadas_horizontais,mapa_correlacao
-from utils.transformadores import serei_semana_mes_options,dados_grafico_barras,get_delta,serei_dia_semana_options,serei_mes_ano_options
+from utils.graficos import liquid_fill,meia_rosca, barras_simples,barras_drilldown, barras_empilhadas_horizontais,mapa_correlacao
+from utils.transformadores import serei_semana_mes_complexo,dados_grafico_barras,get_delta,serie_temporal_dia_semana_complexo,serei_mes_ano_options,top_10_categorias
 from funcoes import graficos
 import streamlit as st
 import datetime as dt
@@ -227,6 +227,14 @@ with st.container(border=True, height = 380):
     #with st.container(border = True, height = 350):
     #    st.plotly_chart(graficos(df).grafico_linhas_tempo(coluna_data='Data',categorias=categorias,titulo='Aderência total por mês'))
 
+    with st.container(border=True,height=350):
+
+        serie_temporal_total_ = df_filtrado[categorias].reset_index().melt("Data")
+
+        serie_temporal_total_['Hiper_categoria'] = serie_temporal_total.variable.map(Hiper_categoria)
+
+        barras_drilldown(*top_10_categorias(serie_temporal_total_,"Hiper_categoria",'variable','value','mean'))
+
 
 with st.container(border=True,height=540):
 
@@ -236,11 +244,11 @@ with st.container(border=True,height=540):
     
     with col1.container(border=True,height=450):
 
-        barras_empilhadas_horizontais(*serei_dia_semana_options(serie_temporal_total,'Data','value','variable','mean'),"400px")
+        barras_empilhadas_horizontais(*serie_temporal_dia_semana_complexo(serie_temporal_total,'Data','value','variable','mean'),"400px")
 
     with col2.container(border=True,height=450):
 
-        barras_empilhadas_horizontais(*serei_semana_mes_options(serie_temporal_total,'Data','value','variable','mean'),"400px")
+        barras_empilhadas_horizontais(*serei_semana_mes_complexo(serie_temporal_total,'Data','value','variable','mean'),"400px")
 
     with st.container(border = True, height = 350):
         
