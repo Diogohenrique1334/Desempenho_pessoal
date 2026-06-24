@@ -21,6 +21,13 @@ def get_valor(session: Session, registro_id: uuid.UUID, habito_id: uuid.UUID) ->
     return rv.valor if rv else None
 
 
+def dia_tem_dados(session: Session, usuario_id: uuid.UUID, data: datetime.date) -> bool:
+    registro = session.query(Registro).filter_by(usuario_id=usuario_id, data=data).first()
+    if not registro:
+        return False
+    return session.query(RegistroValor).filter_by(registro_id=registro.id).first() is not None
+
+
 def toggle_bool(session: Session, registro: Registro, habito_id: uuid.UUID) -> str:
     """Cicla None → 'true' → 'false' → None. Retorna emoji do novo estado."""
     rv = session.query(RegistroValor).filter_by(registro_id=registro.id, habito_id=habito_id).first()
