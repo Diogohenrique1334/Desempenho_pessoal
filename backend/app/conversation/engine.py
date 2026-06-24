@@ -63,6 +63,11 @@ def _processar_onboarding(session: Session, usuario, message: dict) -> None:
             onboarding.processar_nome(session, usuario, message["text"]["body"])
         return
 
+    if step.startswith("aguardando_outro_habito:"):
+        if message.get("type") == "text":
+            onboarding.processar_outro_habito(session, usuario, message["text"]["body"])
+        return
+
     if step.startswith("selecionando_habitos:"):
         if message.get("type") == "interactive":
             payload = _extrair_payload(message)

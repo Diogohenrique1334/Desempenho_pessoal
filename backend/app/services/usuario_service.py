@@ -37,16 +37,20 @@ def listar_todos_habitos(session: Session, usuario_id: uuid.UUID) -> List[Habito
 
 
 def criar_habitos(session: Session, usuario_id: uuid.UUID, habitos: List[dict]) -> None:
-    """habitos: [{"nome": str, "tipo": str}, ...] — usado no onboarding."""
+    """habitos: [{"nome": str, "tipo": str, "emoji": str opcional}, ...] — usado no onboarding."""
+    base_ordem = session.query(func.max(HabitoConfig.ordem)).filter_by(usuario_id=usuario_id).scalar() or 0
     for i, h in enumerate(habitos):
-        session.add(HabitoConfig(usuario_id=usuario_id, nome=h["nome"], tipo=h["tipo"], ordem=i))
+        session.add(HabitoConfig(
+            usuario_id=usuario_id, nome=h["nome"], tipo=h["tipo"],
+            emoji=h.get("emoji"), ordem=base_ordem + i + 1,
+        ))
     session.commit()
 
 
-def criar_habito_unico(session: Session, usuario_id: uuid.UUID, nome: str, tipo: str) -> HabitoConfig:
+def criar_habito_unico(session: Session, usuario_id: uuid.UUID, nome: str, tipo: str, emoji: Optional[str] = None) -> HabitoConfig:
     """Cria um hábito avulso (fluxo de Gerenciar, pós-onboarding)."""
     max_ordem = session.query(func.max(HabitoConfig.ordem)).filter_by(usuario_id=usuario_id).scalar() or 0
-    habito = HabitoConfig(usuario_id=usuario_id, nome=nome[:100], tipo=tipo, ordem=max_ordem + 1)
+    habito = HabitoConfig(usuario_id=usuario_id, nome=nome[:100], tipo=tipo, emoji=emoji, ordem=max_ordem + 1)
     session.add(habito)
     session.commit()
     return habito

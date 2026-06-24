@@ -243,7 +243,7 @@ def escolher_tipo_habito(session: Session, phone: str, usuario_id: uuid.UUID, re
     if not nome:
         return
 
-    usuario_service.criar_habito_unico(session, usuario_id, nome, tipo)
+    usuario_service.criar_habito_unico(session, usuario_id, nome, tipo, emoji="⭐")
     registro_service.set_status_conversa(session, registro, None)
     whatsapp.send_text(phone, f"Hábito '{nome}' criado! 🎉")
     menu_categoria(phone, dia_iso)
@@ -257,11 +257,11 @@ def menu_congelar(session: Session, phone: str, usuario_id: uuid.UUID, dia_iso: 
 
     rows = []
     for h in habitos:
-        emoji = "✅" if h.ativo else "🧊"
+        status_emoji = "✅" if h.ativo else "🧊"
         status = "Ativo" if h.ativo else "Congelado"
         rows.append({
             "id": f"congelar_toggle_{h.id}_{dia_iso}",
-            "title": truncar(f"{emoji} {h.nome}", 24),
+            "title": truncar(f"{status_emoji} {h.emoji or ''} {h.nome}", 24),
             "description": status,
         })
     rows.append({"id": f"gerenciar_{dia_iso}", "title": "⬅️ Voltar", "description": ""})
@@ -287,11 +287,11 @@ def _rows_habitos(session: Session, registro: Registro, habitos: List[HabitoConf
     rows = []
     for h in habitos:
         valor = registro_service.get_valor(session, registro.id, h.id)
-        emoji = registro_service.emoji_status(valor, h.tipo)
+        status_emoji = registro_service.emoji_status(valor, h.tipo)
         desc = registro_service.valor_para_exibicao(valor, h.tipo)
         rows.append({
             "id": f"toggle_{h.id}_{dia_iso}",
-            "title": truncar(f"{emoji} {h.nome}", 24),
+            "title": truncar(f"{status_emoji} {h.emoji or ''} {h.nome}", 24),
             "description": truncar(desc, 72),
         })
     return rows
@@ -301,11 +301,11 @@ def _rows_metricas(session: Session, registro: Registro, habitos: List[HabitoCon
     rows = []
     for h in habitos:
         valor = registro_service.get_valor(session, registro.id, h.id)
-        emoji = registro_service.emoji_status(valor, h.tipo)
+        status_emoji = registro_service.emoji_status(valor, h.tipo)
         desc = registro_service.valor_para_exibicao(valor, h.tipo)
         rows.append({
             "id": f"ask_{h.id}_{dia_iso}",
-            "title": truncar(f"{emoji} {h.nome}", 24),
+            "title": truncar(f"{status_emoji} {h.emoji or ''} {h.nome}", 24),
             "description": truncar(desc, 72),
         })
     return rows

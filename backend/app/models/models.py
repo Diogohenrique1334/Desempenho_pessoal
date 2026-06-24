@@ -34,6 +34,7 @@ class HabitoConfig(Base):
     usuario_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=False)
     nome: Mapped[str] = mapped_column(String(100), nullable=False)
     tipo: Mapped[str] = mapped_column(String(20), nullable=False)
+    emoji: Mapped[Optional[str]] = mapped_column(String(10))
     ordem: Mapped[int] = mapped_column(Integer, default=0)
     ativo: Mapped[bool] = mapped_column(Boolean, default=True)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
